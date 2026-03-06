@@ -1,5 +1,9 @@
 # FastGo
 
+![Go Version](https://img.shields.io/github/go-mod/go-version/acolev/fastgo)
+[![GoDoc](https://godoc.org/github.com/acolev/fastgo?status.svg)](https://godoc.org/github.com/acolev/fastgo)
+[![Go Report Card](https://goreportcard.com/badge/github.com/acolev/fastgo)](https://goreportcard.com/report/github.com/acolev/fastgo)
+
 FastGo is a lean Go API starter for teams that want to begin writing business logic immediately.
 
 It gives you a clean feature-first structure, Fiber v3, GORM, Redis, i18n, JSON API errors, graceful shutdown, hot reload via `air`, and database read/write routing via GORM `dbresolver`.
