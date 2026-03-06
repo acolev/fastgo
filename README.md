@@ -139,29 +139,35 @@ Generate Swagger docs:
 make docs
 ```
 
+Swagger UI is available at:
+
+```text
+/docs
+```
+
 ## API
 
 Current endpoints:
 
 ```text
-GET    /swagger
+GET    /docs
 GET    /docs/swagger.json
 
-GET    /api/probes/ping
-GET    /api/probes/health
-GET    /api/probes/ready
+GET    /ping
+GET    /health
+GET    /ready
 
-POST   /api/t/numbers/range
-GET    /api/t/numbers
-GET    /api/t/numbers/random
-DELETE /api/t/numbers?numbers=1,2,3
-DELETE /api/t/numbers/clear
+POST   /api/v1/t/numbers/range
+GET    /api/v1/t/numbers
+GET    /api/v1/t/numbers/random
+DELETE /api/v1/t/numbers?numbers=1,2,3
+DELETE /api/v1/t/numbers/clear
 ```
 
 Example request:
 
 ```bash
-curl -X POST http://localhost:3005/api/t/numbers/range \
+curl -X POST http://localhost:3005/api/v1/t/numbers/range \
   -H 'Content-Type: application/json' \
   -d '{"from":1,"to":10}'
 ```
@@ -188,10 +194,17 @@ Error responses use:
 
 `error.message` is localized through `locales/en` and `locales/ru`.
 
-Swagger UI is available at:
+Swagger includes generated OpenAPI artifacts:
 
 ```text
-/swagger
+docs/swagger.json
+docs/swagger.yaml
+```
+
+If you change handlers, annotations, or request/response DTOs, regenerate docs with:
+
+```bash
+make docs
 ```
 
 ## Database and Redis Lifecycle
