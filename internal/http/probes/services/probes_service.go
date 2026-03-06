@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"time"
 
 	"fastgo/internal/http/probes/dto"
 	"fastgo/internal/infra/database"
 	appredis "fastgo/internal/infra/redis"
 )
+
+const readinessTimeout = 3 * time.Second
 
 type Service struct{}
 
@@ -36,18 +39,22 @@ func (s *Service) Ready() dto.ProbeResponse {
 	}
 
 	dbStatus := "ok"
-	if err := database.Ping(context.Background()); err != nil {
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), readinessTimeout)
+	if err := database.Ping(dbCtx); err != nil {
 		dbStatus = err.Error()
 		result.Status = "error"
 		result.Message = "service is not ready"
 	}
+	dbCancel()
 
 	redisStatus := "ok"
-	if err := appredis.Ping(context.Background()); err != nil {
+	redisCtx, redisCancel := context.WithTimeout(context.Background(), readinessTimeout)
+	if err := appredis.Ping(redisCtx); err != nil {
 		redisStatus = err.Error()
 		result.Status = "error"
 		result.Message = "service is not ready"
 	}
+	redisCancel()
 
 	result.Services["database"] = dbStatus
 	result.Services["redis"] = redisStatus

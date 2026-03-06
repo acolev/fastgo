@@ -12,6 +12,8 @@ type Config struct {
 	APP_NAME              string
 	APP_ENV               string
 	APP_PORT              string
+	ENABLE_SWAGGER        bool
+	ENABLE_METRICS        bool
 	DB_DSN                string
 	DB_LOG_LEVEL          string
 	DB_READ_DSNS          []string
@@ -47,10 +49,23 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	appEnv := envOrDefault("APP_ENV", "development")
+	enableSwagger, err := envBoolOrDefault("ENABLE_SWAGGER", !isProductionEnv(appEnv))
+	if err != nil {
+		return nil, err
+	}
+
+	enableMetrics, err := envBoolOrDefault("ENABLE_METRICS", true)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		APP_NAME:              envOrDefault("APP_NAME", "FastGo"),
-		APP_ENV:               envOrDefault("APP_ENV", "development"),
+		APP_ENV:               appEnv,
 		APP_PORT:              envOrDefault("APP_PORT", "3005"),
+		ENABLE_SWAGGER:        enableSwagger,
+		ENABLE_METRICS:        enableMetrics,
 		DB_DSN:                envValue("DB_DSN"),
 		DB_LOG_LEVEL:          envValue("DB_LOG_LEVEL"),
 		DB_READ_DSNS:          envList("DB_READ_DSNS"),
@@ -135,4 +150,27 @@ func envDurationOrDefault(key string, fallback time.Duration) (time.Duration, er
 	}
 
 	return value, nil
+}
+
+func envBoolOrDefault(key string, fallback bool) (bool, error) {
+	raw := envValue(key)
+	if raw == "" {
+		return fallback, nil
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a valid boolean: %w", key, err)
+	}
+
+	return value, nil
+}
+
+func isProductionEnv(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "prod", "production":
+		return true
+	default:
+		return false
+	}
 }

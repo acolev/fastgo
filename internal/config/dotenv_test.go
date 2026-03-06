@@ -102,6 +102,8 @@ func TestLoadUsesDefaultAppPort(t *testing.T) {
 	restoreEnv(t, "APP_NAME")
 	restoreEnv(t, "APP_ENV")
 	restoreEnv(t, "APP_PORT")
+	restoreEnv(t, "ENABLE_SWAGGER")
+	restoreEnv(t, "ENABLE_METRICS")
 	if err := os.Unsetenv("APP_NAME"); err != nil {
 		t.Fatalf("unset APP_NAME: %v", err)
 	}
@@ -110,6 +112,12 @@ func TestLoadUsesDefaultAppPort(t *testing.T) {
 	}
 	if err := os.Unsetenv("APP_PORT"); err != nil {
 		t.Fatalf("unset APP_PORT: %v", err)
+	}
+	if err := os.Unsetenv("ENABLE_SWAGGER"); err != nil {
+		t.Fatalf("unset ENABLE_SWAGGER: %v", err)
+	}
+	if err := os.Unsetenv("ENABLE_METRICS"); err != nil {
+		t.Fatalf("unset ENABLE_METRICS: %v", err)
 	}
 
 	cfg, err := Load()
@@ -126,6 +134,14 @@ func TestLoadUsesDefaultAppPort(t *testing.T) {
 
 	if cfg.APP_PORT != "3005" {
 		t.Fatalf("APP_PORT = %q", cfg.APP_PORT)
+	}
+
+	if !cfg.ENABLE_SWAGGER {
+		t.Fatal("ENABLE_SWAGGER should default to true in development")
+	}
+
+	if !cfg.ENABLE_METRICS {
+		t.Fatal("ENABLE_METRICS should default to true")
 	}
 
 	if cfg.AppAddr() != ":3005" {
@@ -195,6 +211,8 @@ func TestLoadParsesDBResolverSettings(t *testing.T) {
 	t.Setenv("APP_NAME", "Ninja API")
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("REDIS_URL", "localhost:6379")
+	t.Setenv("ENABLE_SWAGGER", "false")
+	t.Setenv("ENABLE_METRICS", "true")
 
 	cfg, err := Load()
 	if err != nil {
@@ -235,6 +253,14 @@ func TestLoadParsesDBResolverSettings(t *testing.T) {
 
 	if cfg.APP_ENV != "production" {
 		t.Fatalf("APP_ENV = %q", cfg.APP_ENV)
+	}
+
+	if cfg.ENABLE_SWAGGER {
+		t.Fatal("ENABLE_SWAGGER should be false")
+	}
+
+	if !cfg.ENABLE_METRICS {
+		t.Fatal("ENABLE_METRICS should be true")
 	}
 }
 

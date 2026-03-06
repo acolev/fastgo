@@ -2,7 +2,10 @@
 /.env.*
 !/.env.example
 /.gocache/
+/.gomodcache/
+/.golangci-lint-cache/
 /tmp
+/.tmp
 /.idea/
 /docs/docs.go
 .DS_Store

@@ -26,9 +26,13 @@ COPY --from=builder /src/locales /app/locales
 
 ENV APP_ENV=production
 ENV APP_PORT=3005
+ENV ENABLE_SWAGGER=false
+ENV ENABLE_METRICS=true
 
 USER app
 
 EXPOSE 3005
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -q -O /dev/null http://127.0.0.1:${APP_PORT}/health || exit 1
 
 ENTRYPOINT ["/app/fastgo"]

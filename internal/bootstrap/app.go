@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"fastgo/internal/http/metrics"
 	"fastgo/internal/i18n"
 	"fastgo/internal/shared/logger"
 	"fastgo/internal/shared/response"
@@ -54,17 +55,23 @@ func New(cfg *config.Config) (*fiber.App, error) {
 	app.Use(i18n.Middleware())
 	app.Use(logger.HTTPMiddleware(cfg.APP_ENV))
 
-	swaggerSpec, err := loadSwaggerSpec(swaggerFilePath, cfg.APP_NAME)
-	if err != nil {
-		return nil, err
+	if cfg.ENABLE_SWAGGER {
+		swaggerSpec, err := loadSwaggerSpec(swaggerFilePath, cfg.APP_NAME)
+		if err != nil {
+			return nil, err
+		}
+		app.Get("/api/docs/swagger.json", swaggerSpecHandler(swaggerSpec))
+		app.Use(fiberswagger.New(fiberswagger.Config{
+			BasePath: "/",
+			FilePath: swaggerFilePath,
+			Path:     "docs",
+			Title:    cfg.APP_NAME + " API Docs",
+		}))
 	}
-	app.Get("/api/docs/swagger.json", swaggerSpecHandler(swaggerSpec))
-	app.Use(fiberswagger.New(fiberswagger.Config{
-		BasePath: "/",
-		FilePath: swaggerFilePath,
-		Path:     "docs",
-		Title:    cfg.APP_NAME + " API Docs",
-	}))
+
+	if cfg.ENABLE_METRICS {
+		metrics.RegisterRoutes(app)
+	}
 
 	api := app.Group("/api")
 	v1 := api.Group("/v1")

@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
 	"fastgo/internal/config"
 )
+
+const initPingTimeout = 3 * time.Second
 
 func Init(cfg *config.Config) error {
 	if strings.TrimSpace(cfg.REDIS_URL) == "" {
@@ -22,7 +25,10 @@ func Init(cfg *config.Config) error {
 
 	rdb := redis.NewClient(options)
 
-	if err := rdb.Ping(context.Background()).Err(); err != nil {
+	pingCtx, cancel := context.WithTimeout(context.Background(), initPingTimeout)
+	defer cancel()
+
+	if err := rdb.Ping(pingCtx).Err(); err != nil {
 		_ = rdb.Close()
 		return fmt.Errorf("ping redis: %w", err)
 	}

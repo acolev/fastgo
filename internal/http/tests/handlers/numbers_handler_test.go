@@ -36,7 +36,11 @@ func TestCreateRangeInvalidBodyReturnsLocalizedJSONError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app test: %v", err)
 	}
-	defer resp.Body.Close()
+	t.Cleanup(func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Fatalf("close body: %v", closeErr)
+		}
+	})
 
 	if resp.StatusCode != fiber.StatusBadRequest {
 		t.Fatalf("got status %d, want %d", resp.StatusCode, fiber.StatusBadRequest)

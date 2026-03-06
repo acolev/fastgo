@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"fastgo/internal/shared/logger"
 
@@ -13,6 +14,8 @@ import (
 
 	"fastgo/internal/config"
 )
+
+const initPingTimeout = 3 * time.Second
 
 func Init(cfg *config.Config) error {
 	if strings.TrimSpace(cfg.DB_DSN) == "" {
@@ -36,7 +39,10 @@ func Init(cfg *config.Config) error {
 
 	SetDB(db)
 
-	if err := Ping(context.Background()); err != nil {
+	pingCtx, cancel := context.WithTimeout(context.Background(), initPingTimeout)
+	defer cancel()
+
+	if err := Ping(pingCtx); err != nil {
 		_ = Close()
 		return fmt.Errorf("ping database: %w", err)
 	}

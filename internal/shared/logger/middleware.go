@@ -68,7 +68,7 @@ func shouldSkipHTTPLog(c fiber.Ctx) bool {
 	path := c.Path()
 
 	switch path {
-	case "/ping", "/health", "/ready":
+	case "/ping", "/health", "/ready", "/metrics":
 		return true
 	}
 

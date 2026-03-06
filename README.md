@@ -1,32 +1,30 @@
 # FastGo
 
-![Go Version](https://img.shields.io/github/go-mod/go-version/acolev/fastgo)
-[![Go Report Card](https://goreportcard.com/badge/github.com/acolev/fastgo)](https://goreportcard.com/report/github.com/acolev/fastgo)
+FastGo is a lean Go API starter for teams that want to start shipping business logic immediately.
 
-FastGo is a lean Go API starter for teams that want to begin writing business logic immediately.
-
-It gives you a clean feature-first structure, Fiber v3, GORM, Redis, i18n, JSON API errors, graceful shutdown, hot reload via `air`, and database read/write routing via GORM `dbresolver`.
+It keeps the stack practical: Fiber v3, GORM, Redis, Swagger, i18n, JSON API errors, feature-first HTTP structure, Docker, Docker Compose, `air`, `dbresolver`, and a small amount of tooling that actually helps.
 
 The goal is not to be a framework.
-The goal is to remove the boring setup work without dragging in unnecessary architecture.
+The goal is to remove the boring setup without dragging in unnecessary architecture.
 
 ## What You Get
 
 - Fiber v3 HTTP server
-- env-based config with local `.env` loading
+- env-based config with automatic `.env` loading
 - PostgreSQL via GORM
-- optional read replicas via `dbresolver`
-- Redis client
-- typed Redis JSON cache helper for query/response caching
-- environment-aware logging: colored text in development, JSON in production
-- graceful shutdown with provider cleanup
-- JSON API error handling with stable `error.code`
+- optional read replicas via GORM `dbresolver`
+- Redis client and typed JSON cache helper
+- JSON API error flow with stable `error.code`
 - translations in `locales/en` and `locales/ru`
-- feature-first HTTP structure
-- health/readiness probes
-- `air` config for local development
+- graceful shutdown with DB and Redis cleanup
+- grouped dev logs with Fiber-style request headers and nested SQL/cache lines
+- JSON logs in production
 - Swagger UI and generated OpenAPI docs
-- multi-stage Docker build
+- optional Prometheus `/metrics`
+- `air` for hot reload
+- `docker-compose.yml` for app + Postgres primary/replica + Redis
+- `Makefile` for daily commands
+- `golangci-lint` config and GitHub Actions CI
 
 ## Philosophy
 
@@ -58,6 +56,7 @@ internal/
   bootstrap/
   config/
   http/
+    metrics/
     probes/
     tests/
   i18n/
@@ -98,6 +97,8 @@ Base variables:
 APP_NAME=FastGo
 APP_ENV=development
 APP_PORT=3005
+ENABLE_SWAGGER=true
+ENABLE_METRICS=true
 DB_DSN=postgres://postgres:pass@127.0.0.1:5432/app
 DB_LOG_LEVEL=info
 REDIS_URL=redis://127.0.0.1:6379/0
@@ -113,40 +114,35 @@ DB_CONN_MAX_LIFETIME=1h
 DB_CONN_MAX_IDLE_TIME=15m
 ```
 
-`APP_NAME` is used for the Fiber app name and Swagger title.
+Notes:
 
-`APP_ENV` controls runtime behavior for logging.
-Use `development` locally for colored text logs and `production` for JSON logs.
-
-`DB_DSN` is the primary write connection.
-
-`DB_LOG_LEVEL` controls GORM query logging.
-Use `info` in development to see executed SQL, `warn` or `error` in production to reduce noise.
-
-`DB_READ_DSNS` is optional and accepts a comma-separated list of replica DSNs.
-If it is set, GORM `dbresolver` routes read queries to replicas and writes to the primary connection.
-
-`REDIS_URL` accepts a full Redis URL like `redis://:password@127.0.0.1:6379/2`.
-For backward compatibility, plain `host:port` is still accepted and uses Redis DB `0`.
+- `APP_NAME` is used for the Fiber app name and Swagger title.
+- `APP_ENV` controls runtime behavior. Use `development` locally and `production` in containers.
+- `ENABLE_SWAGGER` controls `/docs` and `/api/docs/swagger.json`. By default it is enabled in development and disabled in production.
+- `ENABLE_METRICS` controls the Prometheus `/metrics` endpoint.
+- `DB_DSN` is the primary write connection.
+- `DB_READ_DSNS` is optional. If set, reads go to replicas and writes stay on the primary.
+- `DB_LOG_LEVEL` controls SQL logging: `info|warn|error|silent`.
+- `REDIS_URL` accepts full Redis URLs like `redis://:password@127.0.0.1:6379/2`. Plain `host:port` still works and uses DB `0`.
 
 ## Local Development
 
-Install `air`:
+Start infrastructure only:
 
 ```bash
-go install github.com/air-verse/air@latest
+make infra-up
 ```
 
-Start the app with hot reload:
+Run the app with hot reload:
 
 ```bash
-air
+make dev
 ```
 
 Or run it directly:
 
 ```bash
-go run cmd/api/main.go
+make run
 ```
 
 Generate Swagger docs:
@@ -155,17 +151,46 @@ Generate Swagger docs:
 make docs
 ```
 
-Swagger UI is available at:
+Useful day-to-day commands:
 
-```text
-/docs
+```bash
+make test
+make lint
+make build
+make down
 ```
+
+## Docker Compose
+
+The project ships with a local stack:
+
+- app
+- PostgreSQL primary
+- PostgreSQL replica
+- Redis
+
+Start everything:
+
+```bash
+make up
+```
+
+Or with raw Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+
+Services:
+
+- app: `http://127.0.0.1:3005`
+- postgres primary: `127.0.0.1:5432`
+- postgres replica: `127.0.0.1:5433`
+- redis: `127.0.0.1:6379`
 
 ## Redis Cache Helper
 
 For simple API/query caching, use the shared typed wrapper from `internal/infra/redis`.
-
-Example:
 
 ```go
 var numbersCache = redis.NewJSONCache[dto.ListResponse]("tests:numbers", 30*time.Second)
@@ -186,28 +211,38 @@ The helper handles:
 - JSON encode/decode
 - stable key namespacing
 - TTL on write
-- one-line cache invalidation by prefix
-- fail-open behavior for request caching, so Redis issues do not break DB-backed responses
+- invalidation by prefix
+- fail-open behavior, so Redis issues do not break DB-backed API responses
 
 ## Logging
 
 HTTP request logs use the standard Fiber logger middleware:
 
-- `development`: short colored text lines
+- `development`: real Fiber-style colored header, grouped into a single block per request
 - `production`: compact JSON lines
-- health checks and Swagger paths are skipped to reduce noise
+- health, metrics and Swagger paths are skipped to reduce noise
+
+Example development block:
+
+```text
+┌ 22:05:44 | 200 |   80.136083ms |       127.0.0.1 | POST    | /v2/auth/refresh -
+│ [cache:miss] tests:numbers:list
+│ [sql 1.531ms] [rows:100] SELECT * FROM "numbers" ORDER BY "number" ASC
+└
+```
 
 Database logs are separate and come from GORM:
 
-- `development`: colorized SQL queries with highlighted keywords are logged by default
-- `production`: default level is reduced to warnings
-- override with `DB_LOG_LEVEL=info|warn|error|silent`
+- `development`: colorized SQL with highlighted keywords
+- `production`: default level is `warn`
+- override with `DB_LOG_LEVEL`
 
-Redis cache logs are emitted on debug level in development:
+Redis cache logs are emitted in development and grouped inside the same request block:
 
-- `redis cache hit`: response came from Redis
-- `redis cache miss`: loader/DB path was used
-- `redis cache set`: fresh value was written to cache
+- `cache:hit`
+- `cache:miss`
+- `cache:set`
+- `cache:invalidate`
 
 ## API
 
@@ -215,7 +250,8 @@ Current endpoints:
 
 ```text
 GET    /docs
-GET    /docs/swagger.json
+GET    /api/docs/swagger.json
+GET    /metrics
 
 GET    /ping
 GET    /health
@@ -236,7 +272,7 @@ curl -X POST http://localhost:3005/api/v1/t/numbers/range \
   -d '{"from":1,"to":10}'
 ```
 
-Success responses use:
+Success responses:
 
 ```json
 {
@@ -244,7 +280,7 @@ Success responses use:
 }
 ```
 
-Error responses use:
+Error responses:
 
 ```json
 {
@@ -258,53 +294,84 @@ Error responses use:
 
 `error.message` is localized through `locales/en` and `locales/ru`.
 
-Swagger includes generated OpenAPI artifacts:
+## Swagger
+
+Generated artifacts live in:
 
 ```text
 docs/swagger.json
 docs/swagger.yaml
 ```
 
-If you change handlers, annotations, or request/response DTOs, regenerate docs with:
+If you change handlers, DTOs, or annotations:
 
 ```bash
 make docs
 ```
 
-## Database and Redis Lifecycle
+To verify docs are committed and up to date:
 
-FastGo initializes database and Redis during bootstrap and closes both connections on shutdown.
-
-The app includes:
-
-- graceful Fiber shutdown
-- database pool close
-- Redis client close
-- readiness checks for both providers
+```bash
+make docs-check
+```
 
 ## Docker
 
 Build the image:
 
 ```bash
-docker build -t fastgo .
+make docker-build
 ```
 
-Run the container:
+Or directly:
 
 ```bash
-docker run --rm -p 3005:3005 --env-file .env fastgo
+docker build -t fastgo:local .
 ```
 
-Make sure your `DB_DSN`, optional `DB_READ_DSNS`, and `REDIS_URL` point to services reachable from inside the container.
-The Docker build generates Swagger docs automatically before compiling the binary.
+Run it:
+
+```bash
+docker run --rm -p 3005:3005 \
+  -e DB_DSN='postgres://postgres:pass@host.docker.internal:5432/app?sslmode=disable' \
+  -e REDIS_URL='redis://host.docker.internal:6379/0' \
+  fastgo:local
+```
+
+The Docker image:
+
+- builds Swagger docs during image build
+- defaults to `APP_ENV=production`
+- disables Swagger by default
+- exposes `/health` via `HEALTHCHECK`
+
+## Tooling
+
+This starter includes:
+
+- `.air.toml` for hot reload
+- `Makefile` for common workflows
+- `.golangci.yml` for linting
+- GitHub Actions CI in `.github/workflows/ci.yml`
+
+Helpful commands:
+
+```bash
+make help
+make fmt
+make test
+make lint
+make docs
+make build
+make check
+```
 
 ## Testing
 
 Run all tests:
 
 ```bash
-go test ./...
+make test
 ```
 
 ## Notes for Extending the Starter
