@@ -13,7 +13,6 @@ import (
 	infraredis "fastgo/internal/infra/redis"
 	"fastgo/internal/models"
 	sharederrors "fastgo/internal/shared/errors"
-	"fastgo/internal/shared/logger"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -61,12 +60,14 @@ func (s *Service) CreateRange(ctx context.Context, from, to int) (dto.CreateRang
 		return dto.CreateRangeResponse{}, fmt.Errorf("list created numbers range: %w", err)
 	}
 
+	s.invalidateCache(ctx)
+
 	return dto.CreateRangeResponse{
 		From:    from,
 		To:      to,
 		Created: tx.RowsAffected,
 		Numbers: stored,
-	}, s.invalidateCache(ctx)
+	}, nil
 }
 
 func (s *Service) List(ctx context.Context) (dto.ListResponse, error) {
@@ -112,10 +113,12 @@ func (s *Service) Delete(ctx context.Context, rawNumbers string) (dto.DeleteResp
 		return dto.DeleteResponse{}, fmt.Errorf("delete numbers: %w", tx.Error)
 	}
 
+	s.invalidateCache(ctx)
+
 	return dto.DeleteResponse{
 		Deleted: tx.RowsAffected,
 		Numbers: numbers,
-	}, s.invalidateCache(ctx)
+	}, nil
 }
 
 func (s *Service) Clear(ctx context.Context) (dto.ClearResponse, error) {
@@ -126,7 +129,9 @@ func (s *Service) Clear(ctx context.Context) (dto.ClearResponse, error) {
 		return dto.ClearResponse{}, fmt.Errorf("clear numbers: %w", tx.Error)
 	}
 
-	return dto.ClearResponse{Deleted: tx.RowsAffected}, s.invalidateCache(ctx)
+	s.invalidateCache(ctx)
+
+	return dto.ClearResponse{Deleted: tx.RowsAffected}, nil
 }
 
 func validateRange(from, to int) error {
@@ -173,10 +178,6 @@ func randomOffset(max int64) (int, error) {
 	return int(value.Int64()), nil
 }
 
-func (s *Service) invalidateCache(ctx context.Context) error {
-	if err := numbersListCache.InvalidateAll(ctx); err != nil {
-		logger.Error(fmt.Sprintf("invalidate tests numbers cache: %v", err))
-	}
-
-	return nil
+func (s *Service) invalidateCache(ctx context.Context) {
+	numbersListCache.InvalidateAllBestEffort(ctx)
 }

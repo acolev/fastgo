@@ -100,9 +100,13 @@ func TestLoadUsesDefaultAppPort(t *testing.T) {
 	})
 
 	restoreEnv(t, "APP_NAME")
+	restoreEnv(t, "APP_ENV")
 	restoreEnv(t, "APP_PORT")
 	if err := os.Unsetenv("APP_NAME"); err != nil {
 		t.Fatalf("unset APP_NAME: %v", err)
+	}
+	if err := os.Unsetenv("APP_ENV"); err != nil {
+		t.Fatalf("unset APP_ENV: %v", err)
 	}
 	if err := os.Unsetenv("APP_PORT"); err != nil {
 		t.Fatalf("unset APP_PORT: %v", err)
@@ -114,6 +118,10 @@ func TestLoadUsesDefaultAppPort(t *testing.T) {
 	}
 	if cfg.APP_NAME != "FastGo" {
 		t.Fatalf("APP_NAME = %q", cfg.APP_NAME)
+	}
+
+	if cfg.APP_ENV != "development" {
+		t.Fatalf("APP_ENV = %q", cfg.APP_ENV)
 	}
 
 	if cfg.APP_PORT != "3005" {
@@ -178,12 +186,14 @@ func TestLoadParsesDBResolverSettings(t *testing.T) {
 	})
 
 	t.Setenv("DB_DSN", "postgres://writer")
+	t.Setenv("DB_LOG_LEVEL", "error")
 	t.Setenv("DB_READ_DSNS", "postgres://read-1, postgres://read-2")
 	t.Setenv("DB_MAX_IDLE_CONNS", "7")
 	t.Setenv("DB_MAX_OPEN_CONNS", "13")
 	t.Setenv("DB_CONN_MAX_LIFETIME", "2h")
 	t.Setenv("DB_CONN_MAX_IDLE_TIME", "20m")
 	t.Setenv("APP_NAME", "Ninja API")
+	t.Setenv("APP_ENV", "production")
 	t.Setenv("REDIS_URL", "localhost:6379")
 
 	cfg, err := Load()
@@ -197,6 +207,10 @@ func TestLoadParsesDBResolverSettings(t *testing.T) {
 
 	if cfg.DB_READ_DSNS[0] != "postgres://read-1" || cfg.DB_READ_DSNS[1] != "postgres://read-2" {
 		t.Fatalf("DB_READ_DSNS = %#v", cfg.DB_READ_DSNS)
+	}
+
+	if cfg.DB_LOG_LEVEL != "error" {
+		t.Fatalf("DB_LOG_LEVEL = %q", cfg.DB_LOG_LEVEL)
 	}
 
 	if cfg.DB_MAX_IDLE_CONNS != 7 {
@@ -217,6 +231,10 @@ func TestLoadParsesDBResolverSettings(t *testing.T) {
 
 	if cfg.APP_NAME != "Ninja API" {
 		t.Fatalf("APP_NAME = %q", cfg.APP_NAME)
+	}
+
+	if cfg.APP_ENV != "production" {
+		t.Fatalf("APP_ENV = %q", cfg.APP_ENV)
 	}
 }
 

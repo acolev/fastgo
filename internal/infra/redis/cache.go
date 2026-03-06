@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"fastgo/internal/shared/logger"
+
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -97,14 +99,20 @@ func (c JSONCache[T]) Set(ctx context.Context, key string, value T) error {
 func (c JSONCache[T]) Remember(ctx context.Context, key string, loader func(context.Context) (T, error)) (T, error) {
 	var zero T
 
-	value, found, err := c.Get(ctx, key)
+	cacheKey, err := c.cacheKey(key)
 	if err != nil {
 		return zero, err
 	}
 
-	if found {
+	value, found, err := c.Get(ctx, key)
+	if err != nil {
+		logger.WarnContext(ctx, "redis cache get failed", "key", cacheKey, "error", err)
+	} else if found {
+		logger.DebugContext(ctx, "[cache:hit] "+cacheKey)
 		return value, nil
 	}
+
+	logger.DebugContext(ctx, "[cache:miss] "+cacheKey)
 
 	value, err = loader(ctx)
 	if err != nil {
@@ -112,7 +120,9 @@ func (c JSONCache[T]) Remember(ctx context.Context, key string, loader func(cont
 	}
 
 	if err := c.Set(ctx, key, value); err != nil {
-		return zero, err
+		logger.WarnContext(ctx, "redis cache set failed", "key", cacheKey, "error", err)
+	} else {
+		logger.DebugContext(ctx, "[cache:set] "+cacheKey+" ttl="+c.ttl.String())
 	}
 
 	return value, nil
@@ -162,6 +172,24 @@ func (c JSONCache[T]) InvalidateAll(ctx context.Context) error {
 
 		cursor = nextCursor
 	}
+}
+
+func (c JSONCache[T]) InvalidateBestEffort(ctx context.Context, keys ...string) {
+	if err := c.Invalidate(ctx, keys...); err != nil {
+		logger.WarnContext(ctx, "redis cache invalidate failed", "prefix", c.prefix, "error", err)
+		return
+	}
+
+	logger.DebugContext(ctx, fmt.Sprintf("[cache:invalidate] %s keys=%d", c.prefix, len(keys)))
+}
+
+func (c JSONCache[T]) InvalidateAllBestEffort(ctx context.Context) {
+	if err := c.InvalidateAll(ctx); err != nil {
+		logger.WarnContext(ctx, "redis cache invalidate all failed", "prefix", c.prefix, "error", err)
+		return
+	}
+
+	logger.DebugContext(ctx, "[cache:invalidate-all] "+c.prefix)
 }
 
 func (c JSONCache[T]) cmdable() cacheCmdable {

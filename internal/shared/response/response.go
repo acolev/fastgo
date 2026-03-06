@@ -25,6 +25,7 @@ type ErrorBody struct {
 
 func ErrorHandler(c fiber.Ctx, err error) error {
 	appErr := sharederrors.From(err)
+
 	body := ErrorBody{
 		Code:    appErr.Code,
 		Message: i18n.T(c, appErr.MessageKey, appErr.Params),

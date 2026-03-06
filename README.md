@@ -18,6 +18,7 @@ The goal is to remove the boring setup work without dragging in unnecessary arch
 - optional read replicas via `dbresolver`
 - Redis client
 - typed Redis JSON cache helper for query/response caching
+- environment-aware logging: colored text in development, JSON in production
 - graceful shutdown with provider cleanup
 - JSON API error handling with stable `error.code`
 - translations in `locales/en` and `locales/ru`
@@ -95,8 +96,10 @@ Base variables:
 
 ```env
 APP_NAME=FastGo
+APP_ENV=development
 APP_PORT=3005
 DB_DSN=postgres://postgres:pass@127.0.0.1:5432/app
+DB_LOG_LEVEL=info
 REDIS_URL=redis://127.0.0.1:6379/0
 ```
 
@@ -112,7 +115,13 @@ DB_CONN_MAX_IDLE_TIME=15m
 
 `APP_NAME` is used for the Fiber app name and Swagger title.
 
+`APP_ENV` controls runtime behavior for logging.
+Use `development` locally for colored text logs and `production` for JSON logs.
+
 `DB_DSN` is the primary write connection.
+
+`DB_LOG_LEVEL` controls GORM query logging.
+Use `info` in development to see executed SQL, `warn` or `error` in production to reduce noise.
 
 `DB_READ_DSNS` is optional and accepts a comma-separated list of replica DSNs.
 If it is set, GORM `dbresolver` routes read queries to replicas and writes to the primary connection.
@@ -165,9 +174,11 @@ result, err := numbersCache.Remember(ctx, "list", func(ctx context.Context) (dto
 	return loadNumbersFromDB(ctx)
 })
 
-if err := numbersCache.InvalidateAll(ctx); err != nil {
+if err != nil {
 	return err
 }
+
+numbersCache.InvalidateAllBestEffort(ctx)
 ```
 
 The helper handles:
@@ -176,6 +187,27 @@ The helper handles:
 - stable key namespacing
 - TTL on write
 - one-line cache invalidation by prefix
+- fail-open behavior for request caching, so Redis issues do not break DB-backed responses
+
+## Logging
+
+HTTP request logs use the standard Fiber logger middleware:
+
+- `development`: short colored text lines
+- `production`: compact JSON lines
+- health checks and Swagger paths are skipped to reduce noise
+
+Database logs are separate and come from GORM:
+
+- `development`: colorized SQL queries with highlighted keywords are logged by default
+- `production`: default level is reduced to warnings
+- override with `DB_LOG_LEVEL=info|warn|error|silent`
+
+Redis cache logs are emitted on debug level in development:
+
+- `redis cache hit`: response came from Redis
+- `redis cache miss`: loader/DB path was used
+- `redis cache set`: fresh value was written to cache
 
 ## API
 

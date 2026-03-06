@@ -10,8 +10,10 @@ import (
 
 type Config struct {
 	APP_NAME              string
+	APP_ENV               string
 	APP_PORT              string
 	DB_DSN                string
+	DB_LOG_LEVEL          string
 	DB_READ_DSNS          []string
 	DB_MAX_IDLE_CONNS     int
 	DB_MAX_OPEN_CONNS     int
@@ -47,8 +49,10 @@ func Load() (*Config, error) {
 
 	return &Config{
 		APP_NAME:              envOrDefault("APP_NAME", "FastGo"),
+		APP_ENV:               envOrDefault("APP_ENV", "development"),
 		APP_PORT:              envOrDefault("APP_PORT", "3005"),
 		DB_DSN:                envValue("DB_DSN"),
+		DB_LOG_LEVEL:          envValue("DB_LOG_LEVEL"),
 		DB_READ_DSNS:          envList("DB_READ_DSNS"),
 		DB_MAX_IDLE_CONNS:     maxIdleConns,
 		DB_MAX_OPEN_CONNS:     maxOpenConns,

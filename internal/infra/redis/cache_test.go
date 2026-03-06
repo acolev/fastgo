@@ -15,6 +15,9 @@ import (
 type fakeCmdable struct {
 	data    map[string]string
 	ttl     map[string]time.Duration
+	getErr  error
+	setErr  error
+	delErr  error
 	scanErr error
 }
 
@@ -26,6 +29,10 @@ func newFakeCmdable() *fakeCmdable {
 }
 
 func (f *fakeCmdable) Get(_ context.Context, key string) *goredis.StringCmd {
+	if f.getErr != nil {
+		return goredis.NewStringResult("", f.getErr)
+	}
+
 	value, ok := f.data[key]
 	if !ok {
 		return goredis.NewStringResult("", goredis.Nil)
@@ -35,6 +42,10 @@ func (f *fakeCmdable) Get(_ context.Context, key string) *goredis.StringCmd {
 }
 
 func (f *fakeCmdable) Set(_ context.Context, key string, value interface{}, expiration time.Duration) *goredis.StatusCmd {
+	if f.setErr != nil {
+		return goredis.NewStatusResult("", f.setErr)
+	}
+
 	switch typed := value.(type) {
 	case string:
 		f.data[key] = typed
@@ -55,6 +66,10 @@ func (f *fakeCmdable) Set(_ context.Context, key string, value interface{}, expi
 }
 
 func (f *fakeCmdable) Del(_ context.Context, keys ...string) *goredis.IntCmd {
+	if f.delErr != nil {
+		return goredis.NewIntResult(0, f.delErr)
+	}
+
 	var deleted int64
 	for _, key := range keys {
 		if _, ok := f.data[key]; ok {
@@ -197,6 +212,50 @@ func TestJSONCacheInvalidateAllScanError(t *testing.T) {
 	err := cache.InvalidateAll(ctx)
 	if err == nil {
 		t.Fatal("expected scan error")
+	}
+}
+
+func TestJSONCacheRememberFallsBackWhenGetFails(t *testing.T) {
+	ctx := context.Background()
+	cache := NewJSONCache[testPayload]("tests:numbers", time.Minute)
+	fake := newFakeCmdable()
+	fake.getErr = errors.New("redis unavailable")
+	cache.client = fake
+
+	loadCount := 0
+	value, err := cache.Remember(ctx, "list", func(context.Context) (testPayload, error) {
+		loadCount++
+		return testPayload{Value: "from-db"}, nil
+	})
+	if err != nil {
+		t.Fatalf("Remember returned error: %v", err)
+	}
+
+	if loadCount != 1 {
+		t.Fatalf("loadCount = %d, want 1", loadCount)
+	}
+
+	if value.Value != "from-db" {
+		t.Fatalf("value = %+v", value)
+	}
+}
+
+func TestJSONCacheRememberReturnsValueWhenSetFails(t *testing.T) {
+	ctx := context.Background()
+	cache := NewJSONCache[testPayload]("tests:numbers", time.Minute)
+	fake := newFakeCmdable()
+	fake.setErr = errors.New("write failed")
+	cache.client = fake
+
+	value, err := cache.Remember(ctx, "list", func(context.Context) (testPayload, error) {
+		return testPayload{Value: "from-db"}, nil
+	})
+	if err != nil {
+		t.Fatalf("Remember returned error: %v", err)
+	}
+
+	if value.Value != "from-db" {
+		t.Fatalf("value = %+v", value)
 	}
 }
 

@@ -24,6 +24,7 @@ COPY --from=builder /out/fastgo /app/fastgo
 COPY --from=builder /src/docs /app/docs
 COPY --from=builder /src/locales /app/locales
 
+ENV APP_ENV=production
 ENV APP_PORT=3005
 
 USER app

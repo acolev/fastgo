@@ -2,12 +2,15 @@ package bootstrap
 
 import (
 	"fastgo/internal/i18n"
+	"fastgo/internal/shared/logger"
 	"fastgo/internal/shared/response"
 	"fmt"
 	"time"
 
 	fiberswagger "github.com/gofiber/contrib/v3/swagger"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 
 	"fastgo/internal/config"
 	"fastgo/internal/http/probes"
@@ -45,7 +48,11 @@ func New(cfg *config.Config) (*fiber.App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load locales: %w", err)
 	}
+
+	app.Use(recover.New())
+	app.Use(requestid.New())
 	app.Use(i18n.Middleware())
+	app.Use(logger.HTTPMiddleware(cfg.APP_ENV))
 
 	swaggerSpec, err := loadSwaggerSpec(swaggerFilePath, cfg.APP_NAME)
 	if err != nil {

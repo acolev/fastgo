@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"fastgo/internal/shared/logger"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/plugin/dbresolver"
@@ -17,7 +19,9 @@ func Init(cfg *config.Config) error {
 		return fmt.Errorf("DB_DSN is empty: set it in the environment or in a .env file")
 	}
 
-	db, err := gorm.Open(postgres.Open(cfg.DB_DSN), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.DB_DSN), &gorm.Config{
+		Logger: logger.NewGORMLogger(cfg.APP_ENV, cfg.DB_LOG_LEVEL),
+	})
 	if err != nil {
 		return fmt.Errorf("open primary database: %w", err)
 	}
