@@ -1,204 +1,240 @@
 # FastGo
 
-Opinionated Go starter for developers who want to launch APIs quickly instead of spending the first days building project scaffolding.
+FastGo is a lean Go API starter for teams that want to begin writing business logic immediately.
 
-FastGo is a minimal, fast, and readable backend project template for Go.
-It provides the essential foundation needed to start building an API immediately without dealing with dependency injection frameworks, complex bootstrapping, or architectural overengineering.
+It gives you a clean feature-first structure, Fiber v3, GORM, Redis, i18n, JSON API errors, graceful shutdown, hot reload via `air`, and database read/write routing via GORM `dbresolver`.
 
-The goal of FastGo is simple: start building business logic immediately.
+The goal is not to be a framework.
+The goal is to remove the boring setup work without dragging in unnecessary architecture.
 
----
+## What You Get
 
-# Philosophy
-
-FastGo follows a few simple principles.
-
-### Simplicity over abstraction
-Avoid unnecessary layers, complex DI containers, and magic.
-
-### Readable structure
-The project structure should be obvious to any Go developer.
-
-### Fast development
-You should be able to start writing real endpoints in minutes.
-
-### No framework lock-in
-FastGo is not a framework. It is a starter structure.
-
-### Infrastructure without DI chaos
-Infrastructure like database or Redis is accessed via simple package accessors instead of large dependency containers.
-
----
-
-# What FastGo provides
-
-FastGo gives you the basic backend foundation out of the box:
-
-- Fiber HTTP server
-- env-based configuration
-- PostgreSQL connection (via GORM)
+- Fiber v3 HTTP server
+- env-based config with local `.env` loading
+- PostgreSQL via GORM
+- optional read replicas via `dbresolver`
 - Redis client
-- health / readiness probes
-- simple HTTP feature structure
-- clear bootstrap system
-- minimal shared utilities
-- migrations directory
+- graceful shutdown with provider cleanup
+- JSON API error handling with stable `error.code`
+- translations in `locales/en` and `locales/ru`
+- feature-first HTTP structure
+- health/readiness probes
+- `air` config for local development
+- Swagger UI and generated OpenAPI docs
+- multi-stage Docker build
 
-No heavy frameworks. No code generators. No architectural ceremony.
+## Philosophy
 
----
+FastGo prefers:
 
-# Project Structure
+- simple bootstrap
+- readable structure
+- feature-first HTTP organization
+- shared infra through package accessors
+- GORM models and `Preload` over raw SQL
+- enough tooling for real work, without ceremony
+
+FastGo avoids:
+
+- DI containers
+- heavy application frameworks
+- speculative repository layers
+- codegen-first architecture
+- boilerplate for its own sake
+
+## Structure
+
+```text
+cmd/
+  api/
+    main.go
 
 internal/
-    bootstrap/
-        app.go
-        providers.go
+  bootstrap/
+  config/
+  http/
+    probes/
+    tests/
+  i18n/
+  infra/
+    database/
+    redis/
+  models/
+  shared/
 
-    config/
-        config.go
+locales/
+  en/
+  ru/
+```
 
-    infra/
-        database/
-            init.go
-            db.go
-            transaction.go
+HTTP features live in:
 
-        redis/
-            init.go
-            redis.go
-
-    http/
-        <feature>/
-            handlers/
-            services/
-            models/
-            routes.go
-
-    shared/
-        response/
-        errors/
-        logger/
-
-database/
-    migrations/
-    seeders/
-
-cmd/
-    api/
-        main.go
-
----
-
-# HTTP Feature Structure
-
-Each HTTP feature lives inside its own directory:
-
+```text
 internal/http/<feature>/
+  dto/
+  handlers/
+  services/
+  routes.go
+```
 
-Example:
+Domain and database models live in:
 
-internal/http/probes/
-    handlers/
-        probes_handler.go
+```text
+internal/models/
+```
 
-    services/
-        probes_service.go
+## Configuration
 
-    models/
-        probe_response.go
+Local config is loaded from `.env` automatically.
 
-    routes.go
+Base variables:
 
-Responsibilities:
+```env
+APP_NAME=FastGo
+APP_PORT=3005
+DB_DSN=postgres://postgres:pass@127.0.0.1:5432/app
+REDIS_URL=127.0.0.1:6379
+```
 
-Handlers:
-- parse request
-- call service
-- return response
+Optional database resolver and pool tuning:
 
-Services:
-- business logic
+```env
+DB_READ_DSNS=postgres://postgres:pass@127.0.0.1:5433/app,postgres://postgres:pass@127.0.0.1:5434/app
+DB_MAX_IDLE_CONNS=10
+DB_MAX_OPEN_CONNS=50
+DB_CONN_MAX_LIFETIME=1h
+DB_CONN_MAX_IDLE_TIME=15m
+```
 
-Models:
-- request/response structures
+`APP_NAME` is used for the Fiber app name and Swagger title.
 
-Routes:
-- register endpoints for the feature
+`DB_DSN` is the primary write connection.
 
----
+`DB_READ_DSNS` is optional and accepts a comma-separated list of replica DSNs.
+If it is set, GORM `dbresolver` routes read queries to replicas and writes to the primary connection.
 
-# Infrastructure
+## Local Development
 
-Infrastructure is intentionally simple.
+Install `air`:
 
-Examples:
+```bash
+go install github.com/air-verse/air@latest
+```
 
-database.DB()
-redis.Client()
+Start the app with hot reload:
 
-Infrastructure is initialized during application bootstrap inside:
+```bash
+air
+```
 
-bootstrap/providers.go
+Or run it directly:
 
----
-
-# Getting Started
-
-1. Clone the repository
-
-git clone https://github.com/yourname/fastgo
-
-2. Create .env
-
-DB_DSN=postgres://user:pass@localhost:5432/app
-REDIS_URL=localhost:6379
-APP_PORT=8080
-
-3. Run the server
-
+```bash
 go run cmd/api/main.go
+```
 
----
+Generate Swagger docs:
 
-# Health Endpoints
+```bash
+make docs
+```
 
-GET /api/probes/ping
-GET /api/probes/health
-GET /api/probes/ready
+## API
 
----
+Current endpoints:
 
-# When to use FastGo
+```text
+GET    /swagger
+GET    /docs/swagger.json
 
-FastGo is ideal for:
+GET    /api/probes/ping
+GET    /api/probes/health
+GET    /api/probes/ready
 
-- REST APIs
-- SaaS backends
-- microservices
-- MVP products
-- internal tools
+POST   /api/t/numbers/range
+GET    /api/t/numbers
+GET    /api/t/numbers/random
+DELETE /api/t/numbers?numbers=1,2,3
+DELETE /api/t/numbers/clear
+```
 
-It is designed for teams that prefer clarity and speed over architectural ceremony.
+Example request:
 
----
+```bash
+curl -X POST http://localhost:3005/api/t/numbers/range \
+  -H 'Content-Type: application/json' \
+  -d '{"from":1,"to":10}'
+```
 
-# What FastGo intentionally avoids
+Success responses use:
 
-FastGo does NOT include:
+```json
+{
+  "data": {}
+}
+```
 
-- dependency injection frameworks
-- heavy application containers
-- auto-discovery systems
-- complex module loaders
-- excessive abstractions
+Error responses use:
 
-You can add these later if needed.
+```json
+{
+  "error": {
+    "code": "invalid_request_body",
+    "message": "Invalid JSON request body",
+    "details": {}
+  }
+}
+```
 
-FastGo simply does not force them on you.
+`error.message` is localized through `locales/en` and `locales/ru`.
 
----
+Swagger UI is available at:
 
-# License
+```text
+/swagger
+```
 
-MIT
+## Database and Redis Lifecycle
+
+FastGo initializes database and Redis during bootstrap and closes both connections on shutdown.
+
+The app includes:
+
+- graceful Fiber shutdown
+- database pool close
+- Redis client close
+- readiness checks for both providers
+
+## Docker
+
+Build the image:
+
+```bash
+docker build -t fastgo .
+```
+
+Run the container:
+
+```bash
+docker run --rm -p 3005:3005 --env-file .env fastgo
+```
+
+Make sure your `DB_DSN`, optional `DB_READ_DSNS`, and `REDIS_URL` point to services reachable from inside the container.
+The Docker build generates Swagger docs automatically before compiling the binary.
+
+## Testing
+
+Run all tests:
+
+```bash
+go test ./...
+```
+
+## Notes for Extending the Starter
+
+- Keep handlers thin.
+- Put HTTP DTOs in `dto/`.
+- Put database/domain entities in `internal/models/`.
+- Prefer GORM models with relations and `Preload`.
+- Use translations for user-facing API text.
+- Keep shared layers minimal.

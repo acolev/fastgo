@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestLoadDotEnvLoadsFromParentDirectory(t *testing.T) {
@@ -98,12 +99,23 @@ func TestLoadUsesDefaultAppPort(t *testing.T) {
 		_ = os.Chdir(prevDir)
 	})
 
+	restoreEnv(t, "APP_NAME")
 	restoreEnv(t, "APP_PORT")
+	if err := os.Unsetenv("APP_NAME"); err != nil {
+		t.Fatalf("unset APP_NAME: %v", err)
+	}
 	if err := os.Unsetenv("APP_PORT"); err != nil {
 		t.Fatalf("unset APP_PORT: %v", err)
 	}
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.APP_NAME != "FastGo" {
+		t.Fatalf("APP_NAME = %q", cfg.APP_NAME)
+	}
+
 	if cfg.APP_PORT != "3005" {
 		t.Fatalf("APP_PORT = %q", cfg.APP_PORT)
 	}
@@ -147,6 +159,64 @@ func TestParseEnvLine(t *testing.T) {
 
 	if value != "postgres://user:pass@localhost:5432/app" {
 		t.Fatalf("value = %q", value)
+	}
+}
+
+func TestLoadParsesDBResolverSettings(t *testing.T) {
+	root := t.TempDir()
+
+	prevDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("chdir root: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(prevDir)
+	})
+
+	t.Setenv("DB_DSN", "postgres://writer")
+	t.Setenv("DB_READ_DSNS", "postgres://read-1, postgres://read-2")
+	t.Setenv("DB_MAX_IDLE_CONNS", "7")
+	t.Setenv("DB_MAX_OPEN_CONNS", "13")
+	t.Setenv("DB_CONN_MAX_LIFETIME", "2h")
+	t.Setenv("DB_CONN_MAX_IDLE_TIME", "20m")
+	t.Setenv("APP_NAME", "Ninja API")
+	t.Setenv("REDIS_URL", "localhost:6379")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if got := len(cfg.DB_READ_DSNS); got != 2 {
+		t.Fatalf("len(DB_READ_DSNS) = %d", got)
+	}
+
+	if cfg.DB_READ_DSNS[0] != "postgres://read-1" || cfg.DB_READ_DSNS[1] != "postgres://read-2" {
+		t.Fatalf("DB_READ_DSNS = %#v", cfg.DB_READ_DSNS)
+	}
+
+	if cfg.DB_MAX_IDLE_CONNS != 7 {
+		t.Fatalf("DB_MAX_IDLE_CONNS = %d", cfg.DB_MAX_IDLE_CONNS)
+	}
+
+	if cfg.DB_MAX_OPEN_CONNS != 13 {
+		t.Fatalf("DB_MAX_OPEN_CONNS = %d", cfg.DB_MAX_OPEN_CONNS)
+	}
+
+	if cfg.DB_CONN_MAX_LIFETIME != 2*time.Hour {
+		t.Fatalf("DB_CONN_MAX_LIFETIME = %s", cfg.DB_CONN_MAX_LIFETIME)
+	}
+
+	if cfg.DB_CONN_MAX_IDLE_TIME != 20*time.Minute {
+		t.Fatalf("DB_CONN_MAX_IDLE_TIME = %s", cfg.DB_CONN_MAX_IDLE_TIME)
+	}
+
+	if cfg.APP_NAME != "Ninja API" {
+		t.Fatalf("APP_NAME = %q", cfg.APP_NAME)
 	}
 }
 

@@ -1,0 +1,267 @@
+basePath: /api
+definitions:
+  dto.ClearEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/dto.ClearResponse'
+    type: object
+  dto.ClearResponse:
+    properties:
+      deleted:
+        type: integer
+    type: object
+  dto.CreateRangeEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/dto.CreateRangeResponse'
+    type: object
+  dto.CreateRangeRequest:
+    properties:
+      from:
+        type: integer
+      to:
+        type: integer
+    type: object
+  dto.CreateRangeResponse:
+    properties:
+      created:
+        type: integer
+      from:
+        type: integer
+      numbers:
+        items:
+          $ref: '#/definitions/models.Number'
+        type: array
+      to:
+        type: integer
+    type: object
+  dto.DeleteEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/dto.DeleteResponse'
+    type: object
+  dto.DeleteResponse:
+    properties:
+      deleted:
+        type: integer
+      numbers:
+        items:
+          type: integer
+        type: array
+    type: object
+  dto.ListEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/dto.ListResponse'
+    type: object
+  dto.ListResponse:
+    properties:
+      count:
+        type: integer
+      numbers:
+        items:
+          $ref: '#/definitions/models.Number'
+        type: array
+    type: object
+  dto.NumberEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/models.Number'
+    type: object
+  dto.ProbeResponse:
+    properties:
+      message:
+        type: string
+      services:
+        additionalProperties: {}
+        type: object
+      status:
+        type: string
+    type: object
+  models.Number:
+    properties:
+      id:
+        type: string
+      number:
+        type: integer
+    type: object
+  response.ErrorBody:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+  response.ErrorEnvelope:
+    properties:
+      error:
+        $ref: '#/definitions/response.ErrorBody'
+    type: object
+info:
+  contact: {}
+  description: FastGo starter API documentation.
+  title: FastGo API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Basic liveness endpoint.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ProbeResponse'
+      summary: Health
+      tags:
+      - probes
+  /ping:
+    get:
+      description: Lightweight ping endpoint.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ProbeResponse'
+      summary: Ping
+      tags:
+      - probes
+  /ready:
+    get:
+      description: Readiness endpoint that checks database and Redis connectivity.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ProbeResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ProbeResponse'
+      summary: Ready
+      tags:
+      - probes
+  /v1/t/numbers:
+    delete:
+      description: Deletes numbers passed in the `numbers` query parameter as comma-separated
+        values.
+      parameters:
+      - description: Comma-separated numbers
+        example: 1,2,3
+        in: query
+        name: numbers
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DeleteEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Delete numbers
+      tags:
+      - tests/numbers
+    get:
+      description: Returns all stored numbers ordered ascending.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ListEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: List numbers
+      tags:
+      - tests/numbers
+  /v1/t/numbers/clear:
+    delete:
+      description: Deletes all stored numbers.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ClearEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Clear numbers
+      tags:
+      - tests/numbers
+  /v1/t/numbers/random:
+    get:
+      description: Returns one random stored number.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.NumberEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Get random number
+      tags:
+      - tests/numbers
+  /v1/t/numbers/range:
+    post:
+      consumes:
+      - application/json
+      description: Creates numbers in the inclusive range from `from` to `to`. Allowed
+        range is 1..199.
+      parameters:
+      - description: Range payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateRangeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CreateRangeEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Create a range of numbers
+      tags:
+      - tests/numbers
+schemes:
+- http
+- https
+swagger: "2.0"

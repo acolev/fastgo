@@ -1,0 +1,10 @@
+.git
+.gocache
+.idea
+.air.toml
+.env
+.env.*
+tmp
+coverage.out
+coverage.html
+*.log

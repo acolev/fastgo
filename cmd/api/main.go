@@ -1,8 +1,14 @@
+// @title FastGo API
+// @version 1.0
+// @description FastGo starter API documentation.
+// @BasePath /api
+// @schemes http https
 package main
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,8 +23,28 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
-	app := bootstrap.New(cfg)
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	app, err := bootstrap.New(cfg)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := bootstrap.ShutdownProviders(); err != nil {
+			log.Printf("providers shutdown failed: %v", err)
+		}
+	}()
+
 	serverErr := make(chan error, 1)
 
 	go func() {
@@ -38,9 +64,9 @@ func main() {
 	select {
 	case err := <-serverErr:
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-		return
+		return nil
 	case <-ctx.Done():
 		log.Println("shutdown signal received")
 	}
@@ -49,10 +75,12 @@ func main() {
 	defer cancel()
 
 	if err := app.ShutdownWithContext(shutdownCtx); err != nil && !errors.Is(err, fiber.ErrNotRunning) {
-		log.Fatalf("graceful shutdown failed: %v", err)
+		return fmt.Errorf("graceful shutdown failed: %w", err)
 	}
 
 	if err := <-serverErr; err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	return nil
 }

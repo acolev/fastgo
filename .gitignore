@@ -1,4 +1,12 @@
-/.idea
 /.env
+/.env.*
+!/.env.example
 /.gocache/
-/tmp/
+/tmp
+/.idea/
+/docs/docs.go
+.DS_Store
+coverage.out
+coverage.html
+*.log
+*.test

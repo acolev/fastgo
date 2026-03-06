@@ -36,14 +36,14 @@ func (s *Service) Ready() dto.ProbeResponse {
 	}
 
 	dbStatus := "ok"
-	if err := database.DB().WithContext(context.Background()).Exec("SELECT 1").Error; err != nil {
+	if err := database.Ping(context.Background()); err != nil {
 		dbStatus = err.Error()
 		result.Status = "error"
 		result.Message = "service is not ready"
 	}
 
 	redisStatus := "ok"
-	if err := appredis.Client().Ping(context.Background()).Err(); err != nil {
+	if err := appredis.Ping(context.Background()); err != nil {
 		redisStatus = err.Error()
 		result.Status = "error"
 		result.Message = "service is not ready"
