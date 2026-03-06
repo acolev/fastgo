@@ -1,0 +1,5 @@
+{
+  "count.one": "{count} книга",
+  "count.few": "{count} книги",
+  "count.many": "{count} книг"
+}

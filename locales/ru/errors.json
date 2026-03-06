@@ -1,0 +1,16 @@
+{
+  "internal": "Внутренняя ошибка сервера",
+  "not_found": "Ресурс не найден",
+  "bad_request": "Некорректный запрос",
+  "unauthorized": "Требуется авторизация",
+  "forbidden": "Доступ запрещён",
+  "method_not_allowed": "Метод не поддерживается",
+  "invalid_request_body": "Некорректное JSON-тело запроса",
+  "numbers_not_found": "Числа не найдены",
+  "numbers_range_between": "\"from\" и \"to\" должны быть в диапазоне от {min} до {max}",
+  "numbers_range_order": "\"from\" должен быть меньше или равен \"to\"",
+  "numbers_query_required": "Query-параметр \"numbers\" обязателен",
+  "numbers_query_empty_values": "Query-параметр \"numbers\" содержит пустые значения",
+  "numbers_invalid_value": "Некорректное значение числа: {value}",
+  "numbers_out_of_range": "Число {value} вне допустимого диапазона {min}-{max}"
+}

@@ -1,0 +1,16 @@
+{
+  "internal": "Internal server error",
+  "not_found": "Resource not found",
+  "bad_request": "Bad request",
+  "unauthorized": "Unauthorized",
+  "forbidden": "Forbidden",
+  "method_not_allowed": "Method not allowed",
+  "invalid_request_body": "Invalid JSON request body",
+  "numbers_not_found": "Numbers not found",
+  "numbers_range_between": "\"from\" and \"to\" must be between {min} and {max}",
+  "numbers_range_order": "\"from\" must be less than or equal to \"to\"",
+  "numbers_query_required": "\"numbers\" query parameter is required",
+  "numbers_query_empty_values": "\"numbers\" query parameter contains empty values",
+  "numbers_invalid_value": "Invalid number value: {value}",
+  "numbers_out_of_range": "Number {value} is out of allowed range {min}-{max}"
+}
