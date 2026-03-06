@@ -92,6 +92,12 @@ redis.Client()
 
 Agents must NOT introduce dependency injection containers.
 
+For simple Redis-based query/response caching, prefer the shared typed wrapper in:
+
+internal/infra/redis
+
+Do not re-implement ad-hoc JSON marshal/get/set cache helpers in feature services if the shared wrapper can solve the task.
+
 ---
 
 # HTTP Feature Structure

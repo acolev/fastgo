@@ -3,24 +3,29 @@ package services
 import (
 	"context"
 	crand "crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"fastgo/internal/http/tests/dto"
 	"fastgo/internal/i18n"
 	"fastgo/internal/infra/database"
+	infraredis "fastgo/internal/infra/redis"
 	"fastgo/internal/models"
 	sharederrors "fastgo/internal/shared/errors"
+	"fastgo/internal/shared/logger"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 const (
-	minNumber = 1
-	maxNumber = 199
+	minNumber           = 1
+	maxNumber           = 199
+	numbersListCacheTTL = 30 * time.Second
 )
+
+var numbersListCache = infraredis.NewJSONCache[dto.ListResponse]("tests:numbers", numbersListCacheTTL)
 
 type Service struct{}
 
@@ -61,50 +66,39 @@ func (s *Service) CreateRange(ctx context.Context, from, to int) (dto.CreateRang
 		To:      to,
 		Created: tx.RowsAffected,
 		Numbers: stored,
-	}, nil
+	}, s.invalidateCache(ctx)
 }
 
 func (s *Service) List(ctx context.Context) (dto.ListResponse, error) {
-	var numbers []models.Number
-	if err := database.DB().WithContext(ctx).Order("number ASC").Find(&numbers).Error; err != nil {
-		return dto.ListResponse{}, fmt.Errorf("list numbers: %w", err)
-	}
+	return numbersListCache.Remember(ctx, "list", func(ctx context.Context) (dto.ListResponse, error) {
+		var numbers []models.Number
+		if err := database.DB().WithContext(ctx).Order("number ASC").Find(&numbers).Error; err != nil {
+			return dto.ListResponse{}, fmt.Errorf("list numbers: %w", err)
+		}
 
-	return dto.ListResponse{
-		Count:   len(numbers),
-		Numbers: numbers,
-	}, nil
+		return dto.ListResponse{
+			Count:   len(numbers),
+			Numbers: numbers,
+		}, nil
+	})
 }
 
 func (s *Service) Random(ctx context.Context) (models.Number, error) {
-	var count int64
-	if err := database.DB().WithContext(ctx).Model(&models.Number{}).Count(&count).Error; err != nil {
-		return models.Number{}, fmt.Errorf("count numbers: %w", err)
-	}
-
-	if count == 0 {
-		return models.Number{}, sharederrors.NotFound("numbers_not_found", "errors.numbers_not_found", nil, nil)
-	}
-
-	offset, err := randomOffset(count)
+	list, err := s.List(ctx)
 	if err != nil {
 		return models.Number{}, err
 	}
 
-	var number models.Number
-	if err := database.DB().WithContext(ctx).
-		Order("number ASC").
-		Offset(offset).
-		Limit(1).
-		First(&number).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return models.Number{}, sharederrors.NotFound("numbers_not_found", "errors.numbers_not_found", nil, nil)
-		}
-
-		return models.Number{}, fmt.Errorf("random number: %w", err)
+	if list.Count == 0 {
+		return models.Number{}, sharederrors.NotFound("numbers_not_found", "errors.numbers_not_found", nil, nil)
 	}
 
-	return number, nil
+	offset, err := randomOffset(int64(list.Count))
+	if err != nil {
+		return models.Number{}, err
+	}
+
+	return list.Numbers[offset], nil
 }
 
 func (s *Service) Delete(ctx context.Context, rawNumbers string) (dto.DeleteResponse, error) {
@@ -121,7 +115,7 @@ func (s *Service) Delete(ctx context.Context, rawNumbers string) (dto.DeleteResp
 	return dto.DeleteResponse{
 		Deleted: tx.RowsAffected,
 		Numbers: numbers,
-	}, nil
+	}, s.invalidateCache(ctx)
 }
 
 func (s *Service) Clear(ctx context.Context) (dto.ClearResponse, error) {
@@ -132,7 +126,7 @@ func (s *Service) Clear(ctx context.Context) (dto.ClearResponse, error) {
 		return dto.ClearResponse{}, fmt.Errorf("clear numbers: %w", tx.Error)
 	}
 
-	return dto.ClearResponse{Deleted: tx.RowsAffected}, nil
+	return dto.ClearResponse{Deleted: tx.RowsAffected}, s.invalidateCache(ctx)
 }
 
 func validateRange(from, to int) error {
@@ -177,4 +171,12 @@ func randomOffset(max int64) (int, error) {
 	}
 
 	return int(value.Int64()), nil
+}
+
+func (s *Service) invalidateCache(ctx context.Context) error {
+	if err := numbersListCache.InvalidateAll(ctx); err != nil {
+		logger.Error(fmt.Sprintf("invalidate tests numbers cache: %v", err))
+	}
+
+	return nil
 }

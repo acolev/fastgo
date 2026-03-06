@@ -14,6 +14,7 @@ The goal is to remove the boring setup work without dragging in unnecessary arch
 - PostgreSQL via GORM
 - optional read replicas via `dbresolver`
 - Redis client
+- typed Redis JSON cache helper for query/response caching
 - graceful shutdown with provider cleanup
 - JSON API error handling with stable `error.code`
 - translations in `locales/en` and `locales/ru`
@@ -93,7 +94,7 @@ Base variables:
 APP_NAME=FastGo
 APP_PORT=3005
 DB_DSN=postgres://postgres:pass@127.0.0.1:5432/app
-REDIS_URL=127.0.0.1:6379
+REDIS_URL=redis://127.0.0.1:6379/0
 ```
 
 Optional database resolver and pool tuning:
@@ -112,6 +113,9 @@ DB_CONN_MAX_IDLE_TIME=15m
 
 `DB_READ_DSNS` is optional and accepts a comma-separated list of replica DSNs.
 If it is set, GORM `dbresolver` routes read queries to replicas and writes to the primary connection.
+
+`REDIS_URL` accepts a full Redis URL like `redis://:password@127.0.0.1:6379/2`.
+For backward compatibility, plain `host:port` is still accepted and uses Redis DB `0`.
 
 ## Local Development
 
@@ -144,6 +148,31 @@ Swagger UI is available at:
 ```text
 /docs
 ```
+
+## Redis Cache Helper
+
+For simple API/query caching, use the shared typed wrapper from `internal/infra/redis`.
+
+Example:
+
+```go
+var numbersCache = redis.NewJSONCache[dto.ListResponse]("tests:numbers", 30*time.Second)
+
+result, err := numbersCache.Remember(ctx, "list", func(ctx context.Context) (dto.ListResponse, error) {
+	return loadNumbersFromDB(ctx)
+})
+
+if err := numbersCache.InvalidateAll(ctx); err != nil {
+	return err
+}
+```
+
+The helper handles:
+
+- JSON encode/decode
+- stable key namespacing
+- TTL on write
+- one-line cache invalidation by prefix
 
 ## API
 
