@@ -13,12 +13,18 @@ GOLANGCI_LINT_VERSION ?= latest
 BUILD_DIR := ./tmp
 BIN_PATH := $(BUILD_DIR)/$(APP_NAME)
 
-.PHONY: help dev run up infra-up down logs ps test test-race lint lint-fix docs docs-check fmt build docker-build tidy check clean
+.PHONY: help dev run migrate seed-list seed-install seed-dev seed-dev-fresh feature up infra-up down logs ps test test-race lint lint-fix docs docs-check fmt build docker-build tidy check clean
 
 help:
 	@printf "%s\n" \
 		"make dev          - run the app with air hot reload" \
 		"make run          - run the app directly with go run" \
+		"make migrate      - run database migrations" \
+		"make seed-list    - list available database seeds" \
+		"make seed-install - apply idempotent initial data seeds" \
+		"make seed-dev     - apply reproducible local development seeds" \
+		"make seed-dev-fresh - reset and apply local development seeds" \
+		"make feature name=users - generate an HTTP feature module" \
 		"make up           - start full docker compose stack" \
 		"make infra-up     - start postgres primary/replica and redis only" \
 		"make down         - stop docker compose stack and remove volumes" \
@@ -43,6 +49,24 @@ dev:
 
 run:
 	@GOCACHE="$(GO_CACHE)" GOMODCACHE="$(GO_MOD_CACHE)" go run cmd/api/main.go
+
+migrate:
+	@GOCACHE="$(GO_CACHE)" GOMODCACHE="$(GO_MOD_CACHE)" go run ./cmd/migrate
+
+seed-list:
+	@GOCACHE="$(GO_CACHE)" GOMODCACHE="$(GO_MOD_CACHE)" go run ./cmd/seed list
+
+seed-install:
+	@GOCACHE="$(GO_CACHE)" GOMODCACHE="$(GO_MOD_CACHE)" go run ./cmd/seed install
+
+seed-dev:
+	@GOCACHE="$(GO_CACHE)" GOMODCACHE="$(GO_MOD_CACHE)" go run ./cmd/seed dev
+
+seed-dev-fresh:
+	@GOCACHE="$(GO_CACHE)" GOMODCACHE="$(GO_MOD_CACHE)" go run ./cmd/seed dev --fresh
+
+feature:
+	@GOCACHE="$(GO_CACHE)" GOMODCACHE="$(GO_MOD_CACHE)" go run ./cmd/feature "$(name)"
 
 up:
 	@$(COMPOSE) up -d --build

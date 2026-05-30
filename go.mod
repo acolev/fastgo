@@ -3,6 +3,7 @@ module fastgo
 go 1.26.0
 
 require (
+	github.com/brianvoe/gofakeit/v7 v7.15.0
 	github.com/gofiber/contrib/v3/swagger v1.0.0-rc.1
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/google/uuid v1.6.0

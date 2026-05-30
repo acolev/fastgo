@@ -32,10 +32,6 @@ func New(cfg *config.Config) (*fiber.App, error) {
 		}
 	}()
 
-	if err := RunMigrations(); err != nil {
-		return nil, err
-	}
-
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.APP_NAME,
 		ErrorHandler: response.ErrorHandler,

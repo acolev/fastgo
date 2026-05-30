@@ -14,8 +14,8 @@ services:
       DB_LOG_LEVEL: warn
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      postgres-primary:
-        condition: service_healthy
+      seed-install:
+        condition: service_completed_successfully
       postgres-replica:
         condition: service_healthy
       redis:
@@ -23,6 +23,36 @@ services:
     ports:
       - "3005:3005"
     restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/migrate"]
+    environment:
+      APP_NAME: FastGo
+      APP_ENV: production
+      DB_DSN: postgres://postgres:postgres@postgres-primary:5432/app?sslmode=disable
+      DB_LOG_LEVEL: warn
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: "no"
+
+  seed-install:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/seed", "install"]
+    environment:
+      APP_NAME: FastGo
+      APP_ENV: production
+      DB_DSN: postgres://postgres:postgres@postgres-primary:5432/app?sslmode=disable
+      DB_LOG_LEVEL: warn
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 
   postgres-primary:
     image: bitnami/postgresql:17

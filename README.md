@@ -51,6 +51,10 @@ FastGo avoids:
 cmd/
   api/
     main.go
+  migrate/
+    main.go
+  seed/
+    main.go
 
 internal/
   bootstrap/
@@ -133,6 +137,18 @@ Start infrastructure only:
 make infra-up
 ```
 
+Apply database migrations:
+
+```bash
+make migrate
+```
+
+Apply reproducible local development seeds:
+
+```bash
+make seed-dev
+```
+
 Run the app with hot reload:
 
 ```bash
@@ -160,11 +176,77 @@ make build
 make down
 ```
 
+## Database Seeds
+
+Seeds are separate from API startup and migrations:
+
+```bash
+make seed-install
+make seed-dev
+make seed-dev-fresh
+make seed-list
+```
+
+- `install` is for mandatory application data. Its seeders must remain idempotent.
+- `dev` is for reproducible local data generated with a fixed faker seed.
+- `dev` is rejected unless `APP_ENV=development`; `--fresh` first resets only the reserved dev seed range.
+- `list` prints the names available for targeted execution.
+
+Run a named seed or override faker parameters directly:
+
+```bash
+go run ./cmd/seed list
+go run ./cmd/seed run dev.numbers
+go run ./cmd/seed dev --seed 42 --count 10
+```
+
+Add mandatory seeders in `internal/infra/database/seeds/install`.
+Add local-only seeders in `internal/infra/database/seeds/dev`.
+
+## Model Factories
+
+Reusable test and development model factories live in `internal/shared/factory`.
+Factories build models without writing to the database:
+
+```go
+number := factory.Number(gofakeit.New(42), factory.NumberOptions{
+    Min: 1,
+    Max: 100,
+})
+```
+
+Dev seeds use the same factories and remain responsible for persistence,
+uniqueness rules, cleanup boundaries and transactions.
+
+## Feature Generator
+
+Generate a minimal HTTP feature module:
+
+```bash
+make feature name=users
+```
+
+This creates:
+
+```text
+internal/http/users/
+  dto/users_dto.go
+  handlers/users_handler.go
+  services/service.go
+  routes.go
+```
+
+The generated module compiles immediately, includes an empty `GET /` list
+endpoint and does not overwrite existing features. Register its routes in
+`internal/bootstrap/app.go` under the required API group.
+
 ## Docker Compose
 
 The project ships with a local stack:
 
 - app
+- one-shot database migrations
+- one-shot idempotent install seeds
 - PostgreSQL primary
 - PostgreSQL replica
 - Redis
