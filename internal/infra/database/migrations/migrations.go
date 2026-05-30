@@ -1,4 +1,4 @@
-package bootstrap
+package migrations
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"fastgo/internal/models"
 )
 
-func RunMigrations() error {
+func Run() error {
 	if err := database.DB().AutoMigrate(&models.Number{}); err != nil {
 		return fmt.Errorf("auto migrate numbers: %w", err)
 	}
